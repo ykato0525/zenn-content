@@ -15,7 +15,7 @@ ClinicalTrials.gov は世界最大の臨床試験登録データベースで、4
 - 介入名からモダリティを分類（抗体・ADC・低分子・核酸・細胞療法・遺伝子療法）
 - モダリティ × Phase でヒートマップと積み上げ棒グラフを可視化
 
-本記事のコードはVertex AI Workbenchで動作確認済み。ローカル環境でも同様に動く。
+本記事のコードはgoogle colabで動作を確認しました。
 
 ### 環境・依存ライブラリ
 ```
@@ -141,13 +141,32 @@ df_raw.head()
 import re
 
 MODALITY_RULES = [
-    # (モダリティ名, キーワードパターン)  ← 上から優先順位が高い
-    ("ADC",          r"antibody.drug conjugate|ADC|\-ADC\b|emtansine|deruxtecan|ozogamicin|vedotin|ravtansine"),
+    ("ADC",          r"antibody.drug conjugate|ADC|\-ADC\b|emtansine|deruxtecan"
+                     r"|ozogamicin|vedotin|ravtansine|deruxtecan"),
+
     ("CAR-T/Cell",   r"CAR.T|chimeric antigen|cell therapy|TIL|NK cell|dendritic cell"),
+
     ("Gene Therapy", r"gene therapy|gene editing|CRISPR|AAV|lentiviral|retroviral|oncolytic"),
+
     ("Nucleic Acid", r"\bsiRNA\b|\bASO\b|\bshRNA\b|\bmiRNA\b|\bmRNA\b|antisense|oligonucleotide"),
-    ("Antibody",     r"\bmab\b|monoclonal antibody|bispecific|checkpoint inhibitor|anti.PD|anti.CTLA|anti.CD\d+|anti.HER"),
-    ("Small Mol.",   r"inhibitor|kinase|tyrosine|small molecule|taxel|platin|fluorouracil|gemcitabine|temozolomide"),
+
+    # 放射線：独立カテゴリ化
+    ("Radiation",    r"radiation|radiotherapy|stereotactic|SBRT|IMRT|proton|brachytherapy"),
+
+    # ホルモン療法：独立カテゴリ化
+    ("Hormone",      r"fulvestrant|tamoxifen|letrozole|anastrozole|exemestane"
+                     r"|enzalutamide|abiraterone|leuprolide|goserelin|bicalutamide"),
+
+    # 抗体：語尾 -mab で一括対応
+    ("Antibody",     r"mab\b|monoclonal antibody|bispecific|checkpoint inhibitor"
+                     r"|anti.PD|anti.CTLA|anti.CD\d+|anti.HER"),
+
+    # 低分子：語尾パターン + 個別薬剤名 
+    ("Small Mol.",   r"inhibitor|kinase|small molecule"
+                 r"|nib\b|parib\b|ciclib\b|lisib\b|rafenib\b"  # 語尾パターン拡張
+                 r"|taxel|platin|fluorouracil|gemcitabine|temozolomide|capecitabine|pemetrexed"
+                 r"|bortezomib|venetoclax|azacitidine|vorinostat|topotecan|irinotecan"
+                 r"|everolimus|lenalidomide|RAD001|ixabepilone|celecoxib"),
 ]
 
 def classify_modality(name: str) -> str:
@@ -171,13 +190,11 @@ print(df_raw["modality"].value_counts())
 APIから返るPhaseは表記が揺れるため正規化する。
 
 ```
-PHASE_ORDER = ["EARLY_PHASE1", "PHASE1", "PHASE1_PHASE2", "PHASE2", "PHASE2_PHASE3", "PHASE3", "PHASE4"]
+PHASE_ORDER = ["EARLY_PHASE1", "PHASE1", "PHASE2", "PHASE3", "PHASE4"]
 PHASE_LABEL = {
     "EARLY_PHASE1":  "Early Ph1",
     "PHASE1":        "Phase 1",
-    "PHASE1_PHASE2": "Ph 1/2",
     "PHASE2":        "Phase 2",
-    "PHASE2_PHASE3": "Ph 2/3",
     "PHASE3":        "Phase 3",
     "PHASE4":        "Phase 4",
 }
@@ -281,19 +298,13 @@ plt.savefig("bar_modality_phase.png", dpi=150, bbox_inches="tight")
 plt.show()
 ```
 
-# 7. 結果の解釈
-可視化から読み取れる典型的なパターン：
-- Small Mol.（低分子）が圧倒的な件数を占める。がん治療の歴史が長く、キナーゼ阻害薬など既存の開発経験が蓄積されているため、Phase 2・3への移行数も多い。
-- Antibody（抗体）はPhase 2・3に厚い。PD-1/PD-L1チェックポイント阻害薬を中心に、既承認薬の適応拡大試験が大量に登録されている点が特徴的。
-- ADCはPhase 1・1/2が多く、まだ開発競争の初期段階にある試験が主流であることがわかる。
-- Nucleic Acid（核酸）はPhase 1が中心で、がん適応での臨床試験はまだ黎明期。mRNA治療薬・siRNAの多くは非がん疾患から臨床入りしているため、件数は抗体や低分子より少ない。
-CAR-T/Cellは血液がんのPhase 1〜2が主体。固形がんへの応用はまだ少数。
-
-# 8. まとめと次のステップ
+# 7. 課題
+Otherの大きさがやや問題です。Phase 1だけで2085件はSmall Mol.の887件を大きく上回っており、未分類の中に意味のある介入が混在している可能性があります。
+記事に載せる場合は2つの選択肢があります：
+① Otherを除外して掲載
+主要6モダリティの比較に集中。図がクリーンになる。
 
 
-データを見ると、モダリティごとに「研究の厚み」と「臨床への転換効率」がまったく異なることがわかる。自分の研究領域が今どのフェーズにいるのかを知ることは、次の一手を選ぶための基盤になる。
-
-# 9. 参考
+# 8. 参考
 - ClinicalTrials.gov API v2 Documentation
 - ClinicalTrials.gov API Explorer
