@@ -1,5 +1,5 @@
 ---
-title: "gBizinfoにアクセスして"
+title: "gBizinfoにアクセスして資金情報を取得する"
 emoji: "🧬"
 type: "tech"          # tech or idea
 topics: ["python", "lifescience", "api", "bioinformatics", "datascience"]
